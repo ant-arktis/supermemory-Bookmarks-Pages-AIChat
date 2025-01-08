@@ -16,12 +16,21 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 
 const bot = new Bot(token);
 
+function escapeMarkdown(text: string): string {
+	return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
+}
+
 bot.command("start", async (ctx) => {
 	const user: User = (await ctx.getAuthor()).user;
 
 	const cipherd = cipher(user.id.toString());
 	await ctx.reply(
-		`Welcome to Supermemory bot. I am here to help you remember things better. Click here to create and link your account: https://supermemory.ai/signin?telegramUser=${cipherd}`,
+		escapeMarkdown(
+			`Welcome to Supermemory bot. I am here to help you remember things better. [Click here to create and link your account](https://supermemory.ai/signin?telegramUser=${cipherd})`,
+		),
+		{
+			parse_mode: "MarkdownV2",
+		},
 	);
 });
 
@@ -38,7 +47,12 @@ bot.on("message", async (ctx) => {
 
 	if (!dbUser) {
 		await ctx.reply(
-			`Welcome to Supermemory bot. I am here to help you remember things better. Click here to create and link your account: https://supermemory.ai/signin?telegramUser=${cipherd}`,
+			escapeMarkdown(
+				`Welcome to Supermemory bot. I am here to help you remember things better. [Click here to create and link your account](https://supermemory.ai/signin?telegramUser=${cipherd})`,
+			),
+			{
+				parse_mode: "MarkdownV2",
+			},
 		);
 
 		return;
@@ -47,7 +61,7 @@ bot.on("message", async (ctx) => {
 	const message = await ctx.reply("I'm thinking...");
 
 	const response = await fetch(
-		`${process.env.BACKEND_BASE_URL}/api/autoChatOrAdd?query=${ctx.message.text}&user=${dbUser.id}`,
+		`${process.env.BACKEND_BASE_URL}/api/autoChatOrAdd?query=${encodeURIComponent(ctx.message.text!)}&user=${dbUser.id}`,
 		{
 			method: "POST",
 			headers: {
@@ -69,8 +83,10 @@ bot.on("message", async (ctx) => {
 		console.log("Failed to get response from backend");
 		console.log(response.status);
 		await ctx.reply(
-			"Sorry, I am not able to process your request at the moment." +
-				(await response.text()),
+			escapeMarkdown(
+				"Sorry, I am not able to process your request at the moment." +
+					(await response.text()),
+			),
 		);
 		return;
 	}
@@ -103,7 +119,14 @@ bot.on("message", async (ctx) => {
 			.returning({ id: storedContent.id });
 	}
 
-	await ctx.api.editMessageText(ctx.chat.id, message.message_id, data.response);
+	await ctx.api.editMessageText(
+		ctx.chat.id,
+		message.message_id,
+		escapeMarkdown(data.response),
+		{
+			parse_mode: "MarkdownV2",
+		},
+	);
 });
 
 export const POST = webhookCallback(bot, "std/http");
